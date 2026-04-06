@@ -15,6 +15,10 @@ import {
   archiveEmail,
   markAsRead,
   decryptTokens,
+  GmailScopeError,
+  listActiveFilters,
+  previewArchiveFilterForEmail,
+  upsertArchiveFilterForEmail,
 } from "@/app/lib/gmail";
 
 function getTokens(request: NextRequest) {
@@ -63,7 +67,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ messages });
       }
       case "reply": {
-        await sendReply(tokens, params.messageId, params.threadId, params.body);
+        const userEmail = await getUserEmail(tokens);
+        await sendReply(
+          tokens,
+          params.messageId,
+          params.threadId,
+          params.body,
+          userEmail
+        );
         return NextResponse.json({ success: true });
       }
       case "archive": {
@@ -74,6 +85,26 @@ export async function POST(request: NextRequest) {
         await markAsRead(tokens, params.messageId);
         return NextResponse.json({ success: true });
       }
+      case "listFilters": {
+        const filters = await listActiveFilters(tokens);
+        return NextResponse.json({ filters });
+      }
+      case "previewArchiveFilter": {
+        const preview = await previewArchiveFilterForEmail(
+          tokens,
+          params.messageId
+        );
+        return NextResponse.json(preview);
+      }
+      case "upsertArchiveFilter": {
+        const result = await upsertArchiveFilterForEmail(
+          tokens,
+          params.messageId,
+          params.matchStrategy,
+          params.existingFilterId
+        );
+        return NextResponse.json(result);
+      }
       case "search": {
         const emails = await searchEmails(tokens, params.query, params.maxResults || 10);
         return NextResponse.json({ emails });
@@ -83,7 +114,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ contacts });
       }
       case "compose": {
-        await sendNewEmail(tokens, params.to, params.subject, params.body);
+        const userEmail = await getUserEmail(tokens);
+        await sendNewEmail(
+          tokens,
+          params.to,
+          params.subject,
+          params.body,
+          userEmail
+        );
         return NextResponse.json({ success: true });
       }
       case "calendarList": {
@@ -120,7 +158,18 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error: any) {
+    if (error instanceof GmailScopeError) {
+      return NextResponse.json(
+        {
+          error: "Reconnect Gmail to grant filter-management access.",
+          missingScopes: error.missingScopes,
+          reauthRequired: true,
+        },
+        { status: 403 }
+      );
+    }
     console.error(`Google API error (${action}): ${error.message || "unknown"}`);
+
     return NextResponse.json(
       { error: error.message || "Google API error" },
       { status: 500 }

@@ -1,5 +1,45 @@
-import { describe, it, expect } from "vitest";
-import { truncateToLatestMessage } from "./gmail";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  appendVoicemailFooter,
+  buildArchiveFilterCriteria,
+  describeFilter,
+  getMissingScopes,
+  GMAIL_FILTER_WRITE_SCOPE,
+  normalizeSubjectForFilter,
+  shouldAddVoicemailFooter,
+  truncateToLatestMessage,
+} from "./gmail";
+
+const FOOTER_ENV_KEYS = [
+  "VOICEMAIL_SITE_URL",
+  "NEXT_PUBLIC_APP_URL",
+  "APP_URL",
+  "RAILWAY_PUBLIC_DOMAIN",
+  "RAILWAY_STATIC_URL",
+] as const;
+
+let originalFooterEnv: Record<string, string | undefined>;
+
+beforeEach(() => {
+  originalFooterEnv = Object.fromEntries(
+    FOOTER_ENV_KEYS.map((key) => [key, process.env[key]])
+  );
+
+  for (const key of FOOTER_ENV_KEYS) {
+    delete process.env[key];
+  }
+});
+
+afterEach(() => {
+  for (const key of FOOTER_ENV_KEYS) {
+    const value = originalFooterEnv[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+});
 
 describe("truncateToLatestMessage", () => {
   it("returns short messages unchanged", () => {
@@ -81,5 +121,91 @@ Original message here...`;
     const result = truncateToLatestMessage(msg, 2000);
     expect(result).toBe(msg);
     expect(result.length).toBe(2000);
+  });
+});
+
+describe("filter helpers", () => {
+  it("normalizes reply prefixes before using subject filters", () => {
+    expect(normalizeSubjectForFilter("Re: Fwd: Board update")).toBe(
+      "Board update"
+    );
+  });
+
+  it("builds a narrow archive filter when subject matching is requested", () => {
+    expect(
+      buildArchiveFilterCriteria(
+        "alice@example.com",
+        "Re: Quarterly plan",
+        "fromAndSubject"
+      )
+    ).toEqual({
+      from: "alice@example.com",
+      subject: "Quarterly plan",
+    });
+  });
+
+  it("falls back to sender-only matching when the subject is empty", () => {
+    expect(
+      buildArchiveFilterCriteria("alice@example.com", "", "fromAndSubject")
+    ).toEqual({
+      from: "alice@example.com",
+    });
+  });
+
+  it("describes archive filters in readable language", () => {
+    expect(
+      describeFilter(
+        { from: "alice@example.com", subject: "Quarterly plan" },
+        { removeLabelIds: ["INBOX"] }
+      )
+    ).toBe(
+      'If from alice@example.com, subject "Quarterly plan", then archive.'
+    );
+  });
+
+  it("detects when filter-management scope is missing", () => {
+    expect(
+      getMissingScopes(
+        {
+          scope:
+            "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify",
+        },
+        [GMAIL_FILTER_WRITE_SCOPE]
+      )
+    ).toEqual([GMAIL_FILTER_WRITE_SCOPE]);
+  });
+});
+
+describe("voicemail footer", () => {
+  it("only enables the footer for the allowlisted Gmail account", () => {
+    expect(shouldAddVoicemailFooter("tomblomfield@gmail.com")).toBe(true);
+    expect(shouldAddVoicemailFooter("TB@YCOMBINATOR.COM")).toBe(true);
+    expect(shouldAddVoicemailFooter("other@example.com")).toBe(false);
+  });
+
+  it("appends the footer with the configured site URL", () => {
+    process.env.VOICEMAIL_SITE_URL = "https://voice-mail.example.com";
+
+    expect(
+      appendVoicemailFooter("Thanks for the note.  \n", "tomblomfield@gmail.com")
+    ).toBe(
+      "Thanks for the note.\n\nsent with voicemail\nhttps://voice-mail.example.com"
+    );
+  });
+
+  it("uses the Railway public domain when no explicit URL is configured", () => {
+    process.env.RAILWAY_PUBLIC_DOMAIN = "voice-email-production.up.railway.app";
+
+    expect(appendVoicemailFooter("Checking in", "tb@ycombinator.com")).toBe(
+      "Checking in\n\nsent with voicemail\nhttps://voice-email-production.up.railway.app"
+    );
+  });
+
+  it("leaves other senders unchanged", () => {
+    process.env.VOICEMAIL_SITE_URL = "https://voice-mail.example.com";
+
+    expect(
+      appendVoicemailFooter("No footer here", "someone@example.com")
+    ).toBe("No footer here");
   });
 });

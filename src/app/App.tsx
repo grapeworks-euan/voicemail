@@ -13,6 +13,11 @@ import {
 } from "@/app/agentConfigs/emailTriage";
 import type { InferredCalendarProfile } from "@/app/lib/calendar";
 
+type AuthState = {
+  authenticated: boolean;
+  filterWriteEnabled: boolean;
+};
+
 function App() {
   const { addTranscriptMessage, addTranscriptBreadcrumb, transcriptItems } =
     useTranscript();
@@ -67,13 +72,20 @@ function App() {
 
   const [sessionStatus, setSessionStatus] =
     useState<SessionStatus>("DISCONNECTED");
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authState, setAuthState] = useState<AuthState | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/status")
       .then((r) => r.json())
-      .then((data) => setIsAuthenticated(data.authenticated))
-      .catch(() => setIsAuthenticated(false));
+      .then((data) =>
+        setAuthState({
+          authenticated: !!data.authenticated,
+          filterWriteEnabled: !!data.filterWriteEnabled,
+        })
+      )
+      .catch(() =>
+        setAuthState({ authenticated: false, filterWriteEnabled: false })
+      );
   }, []);
 
   const fetchEphemeralKey = async (): Promise<string | null> => {
@@ -296,8 +308,10 @@ function App() {
 
   const isConnected = sessionStatus === "CONNECTED";
   const isConnecting = sessionStatus === "CONNECTING";
+  const isAuthenticated = authState?.authenticated ?? false;
+  const filterWriteEnabled = authState?.filterWriteEnabled ?? false;
 
-  if (isAuthenticated === null) {
+  if (authState === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-950 text-white">
         <div className="text-xl">Loading...</div>
@@ -308,7 +322,7 @@ function App() {
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-white gap-6 px-8">
-        <div className="text-4xl font-bold">Voice Nav</div>
+        <div className="text-4xl font-bold">Voicemail AI</div>
         <p className="text-gray-400 text-center text-lg max-w-md">
           Hands-free email and calendar for your commute. Connect your Google
           account to get started.
@@ -328,6 +342,14 @@ function App() {
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight">Voice Nav</h1>
         <p className="text-gray-500 text-sm mt-1">Hands-free email + calendar</p>
+        {!filterWriteEnabled && (
+          <a
+            href="/api/auth"
+            className="inline-block mt-3 text-sm text-amber-300 underline underline-offset-4"
+          >
+            Reconnect Gmail to enable filter management
+          </a>
+        )}
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-lg gap-4">
