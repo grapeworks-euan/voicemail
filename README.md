@@ -1,8 +1,8 @@
-# Voice Nav
+# Voicemail AI
 
 Hands-free email triage for your commute. Uses OpenAI's Realtime API for voice interaction and Gmail API to read, reply, skip, and archive emails — all by voice.
 
-Open the app on your phone, tap **Start**, and your AI assistant walks through your unread emails one by one. No screen needed.
+Open Voicemail AI on your phone, tap **Start**, and your AI assistant walks through your unread emails one by one. No screen needed.
 
 ## How it works
 
