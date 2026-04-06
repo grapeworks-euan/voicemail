@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { truncateToLatestMessage } from "./gmail";
+import {
+  buildArchiveFilterCriteria,
+  describeFilter,
+  getMissingScopes,
+  GMAIL_FILTER_WRITE_SCOPE,
+  normalizeSubjectForFilter,
+  truncateToLatestMessage,
+} from "./gmail";
 
 describe("truncateToLatestMessage", () => {
   it("returns short messages unchanged", () => {
@@ -81,5 +88,57 @@ Original message here...`;
     const result = truncateToLatestMessage(msg, 2000);
     expect(result).toBe(msg);
     expect(result.length).toBe(2000);
+  });
+});
+
+describe("filter helpers", () => {
+  it("normalizes reply prefixes before using subject filters", () => {
+    expect(normalizeSubjectForFilter("Re: Fwd: Board update")).toBe(
+      "Board update"
+    );
+  });
+
+  it("builds a narrow archive filter when subject matching is requested", () => {
+    expect(
+      buildArchiveFilterCriteria(
+        "alice@example.com",
+        "Re: Quarterly plan",
+        "fromAndSubject"
+      )
+    ).toEqual({
+      from: "alice@example.com",
+      subject: "Quarterly plan",
+    });
+  });
+
+  it("falls back to sender-only matching when the subject is empty", () => {
+    expect(
+      buildArchiveFilterCriteria("alice@example.com", "", "fromAndSubject")
+    ).toEqual({
+      from: "alice@example.com",
+    });
+  });
+
+  it("describes archive filters in readable language", () => {
+    expect(
+      describeFilter(
+        { from: "alice@example.com", subject: "Quarterly plan" },
+        { removeLabelIds: ["INBOX"] }
+      )
+    ).toBe(
+      'If from alice@example.com, subject "Quarterly plan", then archive.'
+    );
+  });
+
+  it("detects when filter-management scope is missing", () => {
+    expect(
+      getMissingScopes(
+        {
+          scope:
+            "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify",
+        },
+        [GMAIL_FILTER_WRITE_SCOPE]
+      )
+    ).toEqual([GMAIL_FILTER_WRITE_SCOPE]);
   });
 });
