@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  createCalendarInvite,
+  hasRequiredGoogleScopes,
+  inferCalendarProfile,
   getUnreadEmails,
   getEmailBody,
   getThreadMessages,
   getUserEmail,
+  listCalendarEvents,
   searchEmails,
   findContact,
   sendNewEmail,
@@ -17,7 +21,8 @@ function getTokens(request: NextRequest) {
   const cookie = request.cookies.get("gmail_tokens");
   if (!cookie) return null;
   try {
-    return decryptTokens(cookie.value);
+    const tokens = decryptTokens(cookie.value);
+    return hasRequiredGoogleScopes(tokens) ? tokens : null;
   } catch {
     return null;
   }
@@ -27,7 +32,7 @@ export async function POST(request: NextRequest) {
   const tokens = getTokens(request);
   if (!tokens) {
     return NextResponse.json(
-      { error: "Not authenticated. Please connect Gmail first." },
+      { error: "Not authenticated. Please reconnect your Google account." },
       { status: 401 }
     );
   }
@@ -81,6 +86,33 @@ export async function POST(request: NextRequest) {
         await sendNewEmail(tokens, params.to, params.subject, params.body);
         return NextResponse.json({ success: true });
       }
+      case "calendarList": {
+        const events = await listCalendarEvents(tokens, {
+          startTime: params.startTime,
+          endTime: params.endTime,
+          maxResults: params.maxResults || 10,
+          query: params.query,
+        });
+        return NextResponse.json({ events });
+      }
+      case "calendarSetup": {
+        const profile = await inferCalendarProfile(tokens);
+        return NextResponse.json({ profile });
+      }
+      case "calendarCreate": {
+        const created = await createCalendarInvite(tokens, {
+          title: params.title,
+          startTime: params.startTime,
+          endTime: params.endTime,
+          timeZone: params.timeZone,
+          attendeeEmails: params.attendeeEmails,
+          notes: params.notes,
+          customLocation: params.customLocation,
+          locationPreference: params.locationPreference,
+          inferredProfile: params.inferredProfile,
+        });
+        return NextResponse.json(created);
+      }
       default:
         return NextResponse.json(
           { error: `Unknown action: ${action}` },
@@ -88,9 +120,9 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error: any) {
-    console.error(`Gmail API error (${action}): ${error.message || "unknown"}`);
+    console.error(`Google API error (${action}): ${error.message || "unknown"}`);
     return NextResponse.json(
-      { error: "Gmail API error" },
+      { error: error.message || "Google API error" },
       { status: 500 }
     );
   }
