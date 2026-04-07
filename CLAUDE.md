@@ -9,6 +9,17 @@ cp /Users/tom/Code/voice-email/.env .
 Required vars: OPENAI_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, SESSION_SECRET.
 See .env.example for details.
 
+## Deploying to Railway
+
+The app is hosted on Railway (project: `voice-email`, service: `voice-email`, environment: `production`).
+
+```
+railway link --project voice-email
+railway up --detach --service voice-email
+```
+
+The production URL is https://voice-email-production.up.railway.app.
+
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill
