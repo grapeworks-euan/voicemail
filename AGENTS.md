@@ -17,6 +17,17 @@ See .env.example for details.
 - Google OAuth 2.0 for Gmail + Calendar access
 - OpenAI Realtime API for voice interaction
 
+## Deploying to Railway
+
+The app is hosted on Railway (project: `voice-email`, service: `voice-email`, environment: `production`).
+
+```
+railway link --project voice-email
+railway up --detach --service voice-email
+```
+
+The production URL is https://voice-email-production.up.railway.app.
+
 ## Testing
 
 ```
