@@ -20,6 +20,7 @@ import {
   listActiveFilters,
   previewArchiveFilterForEmail,
   upsertArchiveFilterForEmail,
+  blockSender,
 } from "@/app/lib/gmail";
 import { debugLog } from "@/app/lib/debugLog";
 
@@ -118,6 +119,10 @@ export async function POST(request: NextRequest) {
           params.existingFilterId
         );
         return respond(result);
+      }
+      case "blockSender": {
+        const result = await blockSender(tokens, params.messageId);
+        return NextResponse.json(result);
       }
       case "search": {
         const emails = await searchEmails(tokens, params.query, params.maxResults || 10);
