@@ -314,27 +314,16 @@ function App() {
         extraContext: { addTranscriptBreadcrumb },
       });
 
-      // Send initial "hi" after data channel is ready (turn_detection is set in session config)
-      const sendInitialEvents = () => {
+      // Kick off the first model turn once the data channel is ready.
+      const startInitialResponse = () => {
         try {
-          const id = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
-          addTranscriptMessage(id, "user", "hi", true);
-          sendEvent({
-            type: "conversation.item.create",
-            item: {
-              id,
-              type: "message",
-              role: "user",
-              content: [{ type: "input_text", text: "hi" }],
-            },
-          });
           sendEvent({ type: "response.create" });
         } catch (e) {
           console.warn("Data channel not ready, retrying...", e);
-          setTimeout(sendInitialEvents, 500);
+          setTimeout(startInitialResponse, 500);
         }
       };
-      setTimeout(sendInitialEvents, 500);
+      setTimeout(startInitialResponse, 500);
     } catch (err) {
       console.error("Error connecting:", err);
       setSessionStatus("DISCONNECTED");

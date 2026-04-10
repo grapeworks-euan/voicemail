@@ -156,7 +156,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
         config: {
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.5,
+            threshold: 0.65,
             prefix_padding_ms: 200,
             silence_duration_ms: 500,
             create_response: true,
