@@ -10,10 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@azure/msal-node": "^3.8.10",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@openai/agents": "^0.0.5",
     "@radix-ui/react-icons": "^1.3.2",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
+    "isomorphic-fetch": "^3.0.0",
     "next": "^15.5.15",
     "openai": "^4.77.3",
     "pg": "^8.20.0",
