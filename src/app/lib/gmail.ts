@@ -87,8 +87,8 @@ const FOOTER_ELIGIBLE_SENDERS = new Set([
 ]);
 
 function getEncryptionKey(): string {
-  const key = process.env.SESSION_SECRET;
-  if (!key) throw new Error("SESSION_SECRET environment variable is required");
+  const key = process.env.VOICEMAIL_SESSION_SECRET;
+  if (!key) throw new Error("VOICEMAIL_SESSION_SECRET environment variable is required");
   return key;
 }
 

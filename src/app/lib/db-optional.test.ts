@@ -3,18 +3,18 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // These tests verify that all DB functions degrade gracefully when DATABASE_URL is unset.
 // We must clear the env var BEFORE importing the module so the pool is never created.
 
-describe("db module without DATABASE_URL", () => {
+describe("db module without VOICEMAIL_DATABASE_URL", () => {
   let db: typeof import("./db");
 
   beforeEach(async () => {
-    // Reset module cache so db.ts re-evaluates with no DATABASE_URL
+    // Reset module cache so db.ts re-evaluates with no VOICEMAIL_DATABASE_URL
     vi.resetModules();
-    const originalUrl = process.env.DATABASE_URL;
-    delete process.env.DATABASE_URL;
+    const originalUrl = process.env.VOICEMAIL_DATABASE_URL;
+    delete process.env.VOICEMAIL_DATABASE_URL;
     db = await import("./db");
     // Restore so other test files aren't affected
     if (originalUrl !== undefined) {
-      process.env.DATABASE_URL = originalUrl;
+      process.env.VOICEMAIL_DATABASE_URL = originalUrl;
     }
   });
 

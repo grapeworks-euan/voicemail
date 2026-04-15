@@ -13,7 +13,7 @@ import { Pool } from "pg";
 const TEST_EMAIL = `test-${Date.now()}@example.com`;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.VOICEMAIL_DATABASE_URL,
   max: 2,
 });
 

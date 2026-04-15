@@ -1,9 +1,9 @@
 import { Pool } from "pg";
 
-// Pool is only created when DATABASE_URL is set.
+// Pool is only created when VOICEMAIL_DATABASE_URL is set.
 // All exported functions gracefully degrade when Postgres is unavailable.
-const pool: Pool | null = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 10 })
+const pool: Pool | null = process.env.VOICEMAIL_DATABASE_URL
+  ? new Pool({ connectionString: process.env.VOICEMAIL_DATABASE_URL, max: 10 })
   : null;
 
 function isDbAvailable(): boolean {
