@@ -4,3 +4,4 @@ node_modules/
 token.json
 debug.log
 .gstack/
+*.tsbuildinfo
