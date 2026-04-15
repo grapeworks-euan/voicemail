@@ -1,6 +1,7 @@
 import { getGmailClient } from "@/app/lib/google-auth";
 import { archiveEmail } from "@/app/lib/gmail";
 import { debugLog } from "@/app/lib/debugLog";
+import { getProvider } from "@/app/lib/providers";
 
 const BROWSER_USE_API_BASE = "https://api.browser-use.com/api/v3";
 
@@ -211,18 +212,73 @@ export function extractUnsubscribeLinks(html: string): string[] {
 }
 
 /**
+ * Build a provider-agnostic UnsubscribeInfo from a single unsubscribe link
+ * returned by an EmailProvider (e.g. OutlookProvider). The provider interface
+ * exposes a simple `getUnsubscribeLink(messageId): Promise<string | null>`,
+ * so when we route through it we have just a URL string. We translate that
+ * into the richer UnsubscribeInfo shape the strategy cascade below expects.
+ *
+ * This is the Outlook/non-Gmail path. The Gmail path continues to use
+ * getUnsubscribeInfo() above which reads raw Gmail headers directly —
+ * preserving exact parity with the existing tests (D-09).
+ */
+async function getUnsubscribeInfoViaProvider(
+  messageId: string
+): Promise<UnsubscribeInfo> {
+  const provider = getProvider();
+  const link = await provider.getUnsubscribeLink(messageId);
+
+  const httpsUrls: string[] = [];
+  const mailtoUrls: string[] = [];
+  if (link) {
+    if (link.toLowerCase().startsWith("mailto:")) {
+      mailtoUrls.push(link);
+    } else if (link.startsWith("http://") || link.startsWith("https://")) {
+      httpsUrls.push(link);
+    }
+  }
+
+  // Providers that give us a direct link don't expose List-Unsubscribe-Post
+  // separately. RFC 8058 one-click still works if the resolved URL accepts
+  // the standard POST body — oneClickUnsubscribe() will try it when we set
+  // listUnsubscribePost to the sentinel value. But without a confirmed Post
+  // header we leave it null (the strategy cascade then falls through to
+  // mailto or browser as appropriate).
+  return {
+    listUnsubscribe: link,
+    listUnsubscribePost: null,
+    httpsUrls,
+    mailtoUrls,
+    bodyLinks: [],
+    senderEmail: "",
+    senderName: "",
+  };
+}
+
+/**
  * Perform the unsubscribe action using the best available method:
  * 1. RFC 8058 one-click POST (fastest, most reliable)
  * 2. mailto: unsubscribe (send an email)
  * 3. Browser Use Cloud (navigate the unsubscribe webpage)
+ *
+ * Gets the unsubscribe link via the provider factory — Gmail provider uses
+ * the Gmail-headers path (unchanged from Phase 6), Outlook provider uses
+ * Graph's internetMessageHeaders. Default provider is gmail so existing
+ * behaviour is preserved end-to-end when VOICEMAIL_EMAIL_PROVIDER is unset.
  */
 export async function performUnsubscribe(
   tokens: any,
   messageId: string,
   threadId?: string
 ): Promise<UnsubscribeResult> {
-  // Resolve threadId if not provided (needed for thread-level archive)
-  if (!threadId) {
+  const providerName = (process.env.VOICEMAIL_EMAIL_PROVIDER || "gmail").toLowerCase();
+  const isGmail = providerName === "gmail";
+
+  // Resolve threadId if not provided (needed for thread-level archive).
+  // Only the Gmail path needs this — Outlook's archive/conversation model
+  // differs and Plan 08-04+ will wire up provider-native archiving. For the
+  // Gmail default path this keeps behaviour identical.
+  if (!threadId && isGmail) {
     const gmail = getGmailClient(tokens);
     const msg = await gmail.users.messages.get({
       userId: "me",
@@ -232,7 +288,14 @@ export async function performUnsubscribe(
     threadId = msg.data.threadId || undefined;
   }
 
-  const info = await getUnsubscribeInfo(tokens, messageId);
+  // Route the "where do I get the unsubscribe link from?" step via the
+  // provider factory when a non-Gmail provider is active. The Gmail path
+  // keeps calling getUnsubscribeInfo() directly so existing tests (which
+  // mock gmail.users.messages.get) continue to exercise the same code
+  // path without test shape changes.
+  const info: UnsubscribeInfo = isGmail
+    ? await getUnsubscribeInfo(tokens, messageId)
+    : await getUnsubscribeInfoViaProvider(messageId);
 
   debugLog("unsubscribe", "Unsubscribe info extracted", {
     sender: info.senderEmail,
